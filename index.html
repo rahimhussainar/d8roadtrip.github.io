@@ -16,15 +16,15 @@
         #admin-banner { display: none; background-color: #fef08a; color: #713f12; padding: 8px 15px; text-align: center; font-weight: 500; font-size: 0.9rem; }
         #admin-banner button { background-color: #ca8a04; color: white; padding: 4px 10px; font-size: 0.8rem; margin-left: 15px; border-radius: 6px; }
         #admin-banner button:hover { background-color: #a16207; }
-        /* Hide admin elements by default */
         .admin-only { display: none !important; }
-        /* Show admin elements in admin mode - Specific rules below */
-        body.admin-mode button.admin-only { display: inline-flex !important; } /* For Add buttons */
+        body.admin-mode .admin-only { display: inline-flex !important; } /* Default for buttons */
         body.admin-mode th.admin-only,
-        body.admin-mode td.admin-only { display: table-cell !important; } /* CORRECTED: Use table-cell for table elements */
-
+        body.admin-mode td.admin-only { display: table-cell !important; } /* For table elements */
         body:not(.admin-mode) select.status-select { pointer-events: none; opacity: 0.7; background-color: #4b5563 !important; border-color: #4b5563 !important; color: #9ca3af !important; }
         #admin-login-button { position: absolute; top: 15px; right: 20px; z-index: 50; }
+        /* Make admin buttons slightly smaller */
+        .button-admin-action { padding: 4px 8px !important; font-size: 0.75rem !important; gap: 0.25rem !important; }
+
 
         /* --- TYPOGRAPHY CLASSES --- */
         .text-main-title { font-size: 2.25rem; sm:font-size: 2.5rem; font-weight: 700; line-height: 1.2; }
@@ -51,7 +51,7 @@
         .section-heading-container { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; padding-bottom: 0.75rem; border-bottom: 2px solid #374151; }
 
         /* General Table Styles */
-        th, td { padding: 10px 12px; sm:padding: 12px 15px; text-align: left; border-bottom: 1px solid #374151; white-space: nowrap; }
+        th, td { padding: 10px 12px; sm:padding: 12px 15px; text-align: left; border-bottom: 1px solid #374151; white-space: nowrap; vertical-align: middle; } /* Added vertical align */
         th { background-color: #1f2937; }
         tbody tr:nth-child(even) { background-color: #1f2937; }
         tbody tr:nth-child(odd) { background-color: #1a2233; }
@@ -61,6 +61,15 @@
         tfoot td { color: #e5e7eb; border-top: 2px solid #374151; }
         .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid #374151; border-radius: 10px; margin-bottom: 1rem; }
          .table-wrapper table { margin-bottom: 0; border: none; border-radius: 0; }
+
+        /* ATTENDEE TABLE SPECIFIC STYLES */
+        #attendees-table th:last-child, /* Actions column header */
+        #attendees-table td:last-child { /* Actions column cells */
+            width: 15%; /* Adjust width for two buttons */
+            text-align: right; /* Align buttons right */
+        }
+         #attendees-table td:last-child button { margin-left: 5px; } /* Space between buttons */
+
 
         /* FIXED COSTS TABLE SPECIFIC STYLES */
         #fixed-costs-table tbody tr { background-color: #1a2233; }
@@ -76,6 +85,8 @@
         .button-secondary:hover { background-color: #374151; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); }
         .button-delete { background-color: #991b1b; color: #fecaca; padding: 5px 10px; }
         .button-delete:hover { background-color: #7f1d1d; }
+        .button-edit { background-color: #047857; color: #a7f3d0; padding: 5px 10px; } /* Teal edit button */
+        .button-edit:hover { background-color: #065f46; }
 
         /* Modal Styles */
         .modal { display: none; position: fixed; z-index: 50; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.7); }
@@ -132,7 +143,8 @@
 
     <div class="container mx-auto">
         <header class="text-center my-8 sm:my-12 flex flex-col sm:flex-row items-center justify-center">
-            <svg class="h-12 w-12 sm:h-16 sm:w-16 mb-3 sm:mb-0 sm:mr-4 text-blue-400" viewBox="0 0 200 100" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"> <title>Mountain Logo</title> <polygon points="50,100 0,100 75,10" /> <polygon points="150,100 50,100 125,0" style="opacity:0.7" /> <polygon points="200,100 125,100 175,30" style="opacity:0.5" /> </svg>
+            {/* Replaced SVG with IMG tag */}
+            <img src="logo.png" alt="Trip Logo" class="h-12 w-auto sm:h-16 mb-3 sm:mb-0 sm:mr-4">
             <div>
                 <h1 class="text-main-title text-blue-400">Smoky Mountains Family Trip</h1>
                 <p class="text-subtitle mt-1 sm:mt-2">Trip Planner & Cost Splitter</p>
@@ -155,11 +167,12 @@
                         <th class="text-table-header">Base Cost (Fixed)</th>
                         <th class="text-table-header">Activities Cost</th>
                         <th class="text-table-header">Total Owed</th>
+                        <th class="text-table-header admin-only">Actions</th>
                     </tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
-            <p class="text-info mt-2 sm:mt-3">Update status to 'Confirmed' to include in fixed cost calculations. (Status editable in Admin Mode)</p>
+            <p class="text-info mt-2 sm:mt-3">Update status/attendees in Admin Mode.</p>
         </section>
 
         <section id="fixed-costs" class="mb-8 sm:mb-10">
@@ -293,14 +306,30 @@
              if (isNaN(amount) || typeof amount !== 'number') return '$0.00';
             return amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
         }
-        function renderAttendeesTable() { /* ... */
+        // Updated renderAttendeesTable to include Rename/Delete buttons
+        function renderAttendeesTable() {
             const costs = calculateCosts(); attendeesTableBody.innerHTML = "";
-            if (attendees.length === 0) { attendeesTableBody.innerHTML = `<tr><td colspan="5" class="text-placeholder text-center py-4">No attendees added yet.</td></tr>`; }
+            if (attendees.length === 0) { attendeesTableBody.innerHTML = `<tr><td colspan="6" class="text-placeholder text-center py-4">No attendees added yet.</td></tr>`; } // Colspan is 6 now
             else {
                 attendees.forEach(attendee => {
                     const attendeeCost = costs.attendeeCosts[attendee.id]; const row = attendeesTableBody.insertRow();
                     const disabledAttr = isAdminMode ? '' : 'disabled';
-                    row.innerHTML = ` <td class="text-table-body-highlight">${attendee.name}</td> <td><select class="status-select text-input" data-attendee-id="${attendee.id}" ${disabledAttr}></select></td> <td class="text-table-body">${formatCurrency(attendeeCost.base)}</td> <td class="text-table-body">${formatCurrency(attendeeCost.activities)}</td> <td class="text-table-body-highlight text-blue-300">${formatCurrency(attendeeCost.total)}</td> `;
+                    // Added Actions cell
+                    row.innerHTML = `
+                        <td class="text-table-body-highlight">${attendee.name}</td>
+                        <td><select class="status-select text-input" data-attendee-id="${attendee.id}" ${disabledAttr}></select></td>
+                        <td class="text-table-body">${formatCurrency(attendeeCost.base)}</td>
+                        <td class="text-table-body">${formatCurrency(attendeeCost.activities)}</td>
+                        <td class="text-table-body-highlight text-blue-300">${formatCurrency(attendeeCost.total)}</td>
+                        <td class="text-center admin-only">
+                            <button class="button button-edit text-button button-admin-action" onclick="promptRenameAttendee(${attendee.id})">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 sm:h-4 sm:w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
+                            </button>
+                            <button class="button button-delete text-button button-admin-action" onclick="deleteAttendee(${attendee.id})">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 sm:h-4 sm:w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                            </button>
+                        </td>
+                    `;
                     const select = row.querySelector('select'); ["Undecided", "Confirmed", "Not Coming"].forEach(status => { const option = new Option(status, status); if (attendee.status === status) option.selected = true; select.add(option); });
                     updateStatusSelectBackground(select, attendee.status);
                     if (isAdminMode) { select.addEventListener('change', handleStatusChange); }
@@ -318,7 +347,7 @@
             else {
                 fixedCosts.forEach(cost => {
                     const row = fixedCostsTableBody.insertRow();
-                    row.innerHTML = ` <td class="text-table-body-highlight">${cost.name}</td> <td class="text-table-body">${formatCurrency(cost.amount)}</td> <td class="text-center admin-only"> <button class="button button-delete text-button" onclick="deleteFixedCost(${cost.id})"> <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg> </button> </td> `;
+                    row.innerHTML = ` <td class="text-table-body-highlight">${cost.name}</td> <td class="text-table-body">${formatCurrency(cost.amount)}</td> <td class="text-center admin-only"> <button class="button button-delete text-button button-admin-action" onclick="deleteFixedCost(${cost.id})"> <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg> </button> </td> `;
                 });
             }
             totalFixedCostEl.textContent = formatCurrency(costs.totalFixed); confirmedAttendeesCountEl.textContent = costs.confirmedCount; costPerPersonEl.textContent = formatCurrency(costs.baseCostPerPerson);
@@ -336,7 +365,7 @@
             itineraryItems.sort((a, b) => { const dateA = new Date(a.startDate + 'T' + (a.startTime || '00:00') + ':00Z'); const dateB = new Date(b.startDate + 'T' + (b.startTime || '00:00') + ':00Z'); return dateA - dateB; });
             itineraryItems.forEach(item => {
                 const row = itineraryTableBody.insertRow(); row.dataset.itemId = item.id; let dateRange = formatDate(item.startDate); if (item.endDate && item.endDate !== item.startDate) { dateRange += ` - ${formatDate(item.endDate)}`; } let timeRange = ''; if (item.startTime) { timeRange = formatTime(item.startTime); if (item.endTime) { timeRange += ` - ${formatTime(item.endTime)}`; } } else { timeRange = 'N/A'; }
-                row.innerHTML = ` <td class="text-center text-table-body">${item.icon || '📝'}</td> <td class="text-itinerary-item-name">${item.name}</td> <td class="text-itinerary-item-details">${dateRange}</td> <td class="text-itinerary-item-details">${timeRange}</td> <td class="text-table-body">${item.notes || ''}</td> <td class="text-center admin-only"> <button class="button button-delete text-button" onclick="deleteItineraryItem(${item.id})"> <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"> <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /> </svg> </button> </td> `;
+                row.innerHTML = ` <td class="text-center text-table-body">${item.icon || '📝'}</td> <td class="text-itinerary-item-name">${item.name}</td> <td class="text-itinerary-item-details">${dateRange}</td> <td class="text-itinerary-item-details">${timeRange}</td> <td class="text-table-body">${item.notes || ''}</td> <td class="text-center admin-only"> <button class="button button-delete text-button button-admin-action" onclick="deleteItineraryItem(${item.id})"> <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"> <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /> </svg> </button> </td> `;
             });
         }
         function formatDate(dateString, options = { month: 'short', day: 'numeric', year: 'numeric' }) { /* ... */
@@ -404,12 +433,65 @@
             if (!name) { alert("Please enter the attendee's name."); return; } if (attendees.some(att => att.name.toLowerCase() === name.toLowerCase())) { alert(`Attendee "${name}" already exists.`); return; }
             const newAttendee = { id: nextAttendeeId++, name: name, status: status }; attendees.push(newAttendee); closeModal('attendee-modal'); renderAllCostsAndAttendees();
         }
+        // --- New Attendee Management Handlers ---
+        function promptRenameAttendee(attendeeId) {
+            if (!isAdminMode) { alert("Admin mode required to rename attendees."); return; }
+            const attendee = attendees.find(a => a.id === attendeeId);
+            if (!attendee) return;
+
+            const currentName = attendee.name;
+            const newName = prompt(`Enter new name for "${currentName}":`, currentName);
+
+            if (newName && newName.trim() !== '' && newName.trim() !== currentName) {
+                 const trimmedNewName = newName.trim();
+                 // Check if new name already exists (case-insensitive, excluding self)
+                 if (attendees.some(att => att.id !== attendeeId && att.name.toLowerCase() === trimmedNewName.toLowerCase())) {
+                     alert(`Attendee name "${trimmedNewName}" already exists.`);
+                     return;
+                 }
+                 // Update the name
+                 attendee.name = trimmedNewName;
+                 // Re-render relevant parts (attendee table, potentially activity cards if names are displayed)
+                 renderAllCostsAndAttendees(); // Simplest way to update all potential name displays
+                 // Also update participant list in activity modal if it's open
+                 if (activityModal.style.display === 'block') {
+                     populateModalParticipants();
+                 }
+
+            } else if (newName !== null) { // User entered empty string or same name
+                 alert("Invalid or unchanged name provided.");
+            }
+        }
+
+        function deleteAttendee(attendeeId) {
+             if (!isAdminMode) { alert("Admin mode required to delete attendees."); return; }
+             const attendee = attendees.find(a => a.id === attendeeId);
+             if (!attendee) return;
+
+             // Check if attendee has costs associated or is only participant in an activity? (Optional check)
+             // For now, just confirm deletion.
+             if (confirm(`Are you sure you want to delete attendee "${attendee.name}"? This cannot be undone.`)) {
+                 // Remove attendee from main list
+                 attendees = attendees.filter(a => a.id !== attendeeId);
+
+                 // Remove attendee from any activity participant lists
+                 activities.forEach(activity => {
+                     activity.participants = activity.participants.filter(pId => pId !== attendeeId);
+                 });
+
+                 // Re-render everything
+                 renderAllCostsAndAttendees();
+                  // Also update participant list in activity modal if it's open
+                 if (activityModal.style.display === 'block') {
+                     populateModalParticipants();
+                 }
+             }
+        }
+
 
         // --- Admin Login/Logout ---
         function attemptAdminLogin() {
-            // DEBUG: Added alert
-            // alert("Admin login button clicked!");
-            console.log("Admin login button clicked!"); // Keep console log
+            console.log("Admin login button clicked!");
             const pinEntered = prompt("Enter Admin PIN:");
             if (pinEntered === ADMIN_PIN) { isAdminMode = true; updateAdminUI(); }
             else if (pinEntered !== null) { alert("Incorrect PIN."); }
@@ -440,3 +522,4 @@
 
 </body>
 </html>
+
